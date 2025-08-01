@@ -1,4 +1,12 @@
-const { pgTable, serial, text, timestamp, boolean, decimal, integer } = require("drizzle-orm/pg-core");
+const {
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  boolean,
+  decimal,
+  integer,
+} = require("drizzle-orm/pg-core");
 
 const reimbursements = pgTable("reimbursements", {
   id: serial("id").primaryKey(),
@@ -18,4 +26,18 @@ const reimbursements = pgTable("reimbursements", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-module.exports = { reimbursements };
+const ooo = pgTable("ooo", {
+  id: serial("id").primaryKey(),
+  userName: text("user_name").notNull(),
+  userEmail: text("user_email").notNull(),
+  active: boolean("active").default(true).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  reason: text("reason").notNull(),
+  message: text("message").notNull(),
+  emergencyContact: text("emergency_contact"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+module.exports = { reimbursements, ooo };

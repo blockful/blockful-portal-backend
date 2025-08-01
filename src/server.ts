@@ -2,6 +2,7 @@ require("dotenv/config");
 const Fastify = require("fastify");
 const { db } = require("./db");
 const reimbursementRoutes = require("./reimbursement/routes");
+const oooRoutes = require("./ooo/routes");
 
 const fastify = Fastify({
   logger: true,
@@ -65,34 +66,42 @@ fastify.get("/", async (request: any, reply: any) => {
 });
 
 // Dashboard
-fastify.get(
-  "/dashboard",
-  async (request: any, reply: any) => {
-    try {
-      // Get some stats for the dashboard
-      const allReimbursements = await db.select().from(require("./db/schema").reimbursements);
+fastify.get("/dashboard", async (request: any, reply: any) => {
+  try {
+    // Get some stats for the dashboard
+    const allReimbursements = await db
+      .select()
+      .from(require("./db/schema").reimbursements);
 
-      return {
-        message: "Welcome to your reimbursement dashboard!",
-        stats: {
-          totalReimbursements: allReimbursements.length,
-          pendingReimbursements: allReimbursements.filter((r: any) => r.status === "pending").length,
-          approvedReimbursements: allReimbursements.filter((r: any) => r.status === "approved").length,
-          paidReimbursements: allReimbursements.filter((r: any) => r.status === "paid").length,
-        },
-        actions: [
-          { label: "View All Reimbursements", url: "/reimbursements" },
-          { label: "Create New Reimbursement", url: "/reimbursements" },
-        ],
-      };
-    } catch (error) {
-      reply.code(500).send({ error: "Failed to load dashboard" });
-    }
+    return {
+      message: "Welcome to your reimbursement dashboard!",
+      stats: {
+        totalReimbursements: allReimbursements.length,
+        pendingReimbursements: allReimbursements.filter(
+          (r: any) => r.status === "pending"
+        ).length,
+        approvedReimbursements: allReimbursements.filter(
+          (r: any) => r.status === "approved"
+        ).length,
+        paidReimbursements: allReimbursements.filter(
+          (r: any) => r.status === "paid"
+        ).length,
+      },
+      actions: [
+        { label: "View All Reimbursements", url: "/reimbursements" },
+        { label: "Create New Reimbursement", url: "/reimbursements" },
+      ],
+    };
+  } catch (error) {
+    reply.code(500).send({ error: "Failed to load dashboard" });
   }
-);
+});
 
 // Register reimbursement routes
 fastify.register(reimbursementRoutes, { prefix: "/" });
+
+// Register OOO routes
+fastify.register(oooRoutes, { prefix: "/" });
 
 // Serve static files (for login page)
 fastify.register(require("@fastify/static"), {
