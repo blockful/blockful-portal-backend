@@ -18,12 +18,12 @@ async function reimbursementRoutes(fastify: any, options: any) {
         }
 
         // Validate required fields
-        const { amount, currency = "USD", description, invoiceDate, userId } = data.fields;
+        const { amount, currency = "USD", description, invoiceDate, userName, userEmail, userAddress } = data.fields;
         
-        if (!amount || !invoiceDate || !userId) {
+        if (!amount || !invoiceDate || !userName || !userEmail) {
           reply.code(400).send({ 
             error: "Missing required fields", 
-            required: ["amount", "invoiceDate", "userId"] 
+            required: ["amount", "invoiceDate", "userName", "userEmail"] 
           });
           return;
         }
@@ -42,10 +42,10 @@ async function reimbursementRoutes(fastify: any, options: any) {
           return;
         }
 
-        // Validate userId
-        const userIdValue = parseInt(userId.value);
-        if (isNaN(userIdValue) || userIdValue <= 0) {
-          reply.code(400).send({ error: "Invalid user ID" });
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(userEmail.value)) {
+          reply.code(400).send({ error: "Invalid email format" });
           return;
         }
 
@@ -67,7 +67,9 @@ async function reimbursementRoutes(fastify: any, options: any) {
         const reimbursement = await db
           .insert(reimbursements)
           .values({
-            userId: userIdValue,
+            userName: userName.value,
+            userEmail: userEmail.value,
+            userAddress: userAddress?.value || null,
             amount: amountValue,
             currency: currency.value || "USD",
             description: description?.value || null,
@@ -83,6 +85,9 @@ async function reimbursementRoutes(fastify: any, options: any) {
           message: "Reimbursement request created successfully",
           reimbursement: {
             id: reimbursement[0].id,
+            userName: reimbursement[0].userName,
+            userEmail: reimbursement[0].userEmail,
+            userAddress: reimbursement[0].userAddress,
             amount: reimbursement[0].amount,
             currency: reimbursement[0].currency,
             description: reimbursement[0].description,
@@ -102,28 +107,16 @@ async function reimbursementRoutes(fastify: any, options: any) {
     }
   );
 
-  // Get user's reimbursements
+  // Get all reimbursements
   fastify.get(
     "/reimbursements",
     async (request: any, reply: any) => {
       try {
-        const { userId, status, limit = 50, offset = 0 } = request.query;
-
-        if (!userId) {
-          reply.code(400).send({ error: "userId is required" });
-          return;
-        }
-
-        const userIdValue = parseInt(userId);
-        if (isNaN(userIdValue) || userIdValue <= 0) {
-          reply.code(400).send({ error: "Invalid user ID" });
-          return;
-        }
+        const { status, limit = 50, offset = 0 } = request.query;
 
         let query = db
           .select()
           .from(reimbursements)
-          .where(eq(reimbursements.userId, userIdValue))
           .orderBy(desc(reimbursements.createdAt))
           .limit(parseInt(limit))
           .offset(parseInt(offset));
@@ -132,11 +125,14 @@ async function reimbursementRoutes(fastify: any, options: any) {
           query = query.where(eq(reimbursements.status, status));
         }
 
-        const userReimbursements = await query;
+        const allReimbursements = await query;
 
         reply.send({
-          reimbursements: userReimbursements.map((r: any) => ({
+          reimbursements: allReimbursements.map((r: any) => ({
             id: r.id,
+            userName: r.userName,
+            userEmail: r.userEmail,
+            userAddress: r.userAddress,
             amount: r.amount,
             currency: r.currency,
             description: r.description,
@@ -145,7 +141,7 @@ async function reimbursementRoutes(fastify: any, options: any) {
             fileName: r.fileName,
             createdAt: r.createdAt,
           })),
-          total: userReimbursements.length,
+          total: allReimbursements.length,
         });
       } catch (error) {
         fastify.log.error("Get reimbursements error:", error);
@@ -175,6 +171,9 @@ async function reimbursementRoutes(fastify: any, options: any) {
         reply.send({
           reimbursement: {
             id: reimbursement[0].id,
+            userName: reimbursement[0].userName,
+            userEmail: reimbursement[0].userEmail,
+            userAddress: reimbursement[0].userAddress,
             amount: reimbursement[0].amount,
             currency: reimbursement[0].currency,
             description: reimbursement[0].description,
@@ -229,28 +228,32 @@ async function reimbursementRoutes(fastify: any, options: any) {
     }
   );
 
-  // Update reimbursement (user can only update description)
+  // Update reimbursement (only description and status)
   fastify.put(
     "/reimbursements/:id",
     async (request: any, reply: any) => {
       try {
         const { id } = request.params;
-        const { description } = request.body;
+        const { description, status } = request.body;
+
+        // Validate status if provided
+        if (status && !["pending", "approved", "rejected", "paid"].includes(status)) {
+          reply.code(400).send({ error: "Invalid status. Must be one of: pending, approved, rejected, paid" });
+          return;
+        }
 
         const reimbursement = await db
           .update(reimbursements)
           .set({
             description: description || null,
+            status: status || undefined,
             updatedAt: new Date(),
           })
-          .where(and(
-            eq(reimbursements.id, parseInt(id)),
-            eq(reimbursements.status, "pending") // Only allow updates for pending reimbursements
-          ))
+          .where(eq(reimbursements.id, parseInt(id)))
           .returning();
 
         if (reimbursement.length === 0) {
-          reply.code(404).send({ error: "Reimbursement not found or cannot be updated" });
+          reply.code(404).send({ error: "Reimbursement not found" });
           return;
         }
 
@@ -258,6 +261,9 @@ async function reimbursementRoutes(fastify: any, options: any) {
           message: "Reimbursement updated successfully",
           reimbursement: {
             id: reimbursement[0].id,
+            userName: reimbursement[0].userName,
+            userEmail: reimbursement[0].userEmail,
+            userAddress: reimbursement[0].userAddress,
             amount: reimbursement[0].amount,
             currency: reimbursement[0].currency,
             description: reimbursement[0].description,

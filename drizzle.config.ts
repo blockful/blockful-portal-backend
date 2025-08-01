@@ -15,5 +15,5 @@ module.exports = defineConfig({
 
   /* --- (nice-to-have, toggle as you like) --------------- */
   strict: true, // fail if a migration would lose data
-  verbose: false, // set true to print SQL during CLI runs
+  verbose: true, // set true to print SQL during CLI runs
 });

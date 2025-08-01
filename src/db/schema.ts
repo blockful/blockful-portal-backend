@@ -1,28 +1,10 @@
-const {
-  pgTable,
-  serial,
-  text,
-  timestamp,
-  boolean,
-  decimal,
-  integer,
-} = require("drizzle-orm/pg-core");
-
-const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  googleId: text("google_id").unique(),
-  avatar: text("avatar"),
-  isActive: boolean("is_active").default(true).notNull(),
-  lastLogin: timestamp("last_login"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+const { pgTable, serial, text, timestamp, boolean, decimal, integer } = require("drizzle-orm/pg-core");
 
 const reimbursements = pgTable("reimbursements", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userName: text("user_name").notNull(),
+  userEmail: text("user_email").notNull(),
+  userAddress: text("user_address"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").default("USD").notNull(),
   description: text("description"),
@@ -36,4 +18,4 @@ const reimbursements = pgTable("reimbursements", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-module.exports = { users, reimbursements };
+module.exports = { reimbursements };

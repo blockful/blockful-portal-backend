@@ -1,8 +1,6 @@
 require("dotenv/config");
 const Fastify = require("fastify");
 const { db } = require("./db");
-const { users } = require("./db/schema");
-const authRoutes = require("./auth/routes");
 const reimbursementRoutes = require("./reimbursement/routes");
 
 const fastify = Fastify({
@@ -58,60 +56,13 @@ fastify.register(require("@fastify/oauth2"), {
 // Hello World endpoint
 fastify.get("/", async (request: any, reply: any) => {
   return {
-    message: "Hello World from Fastify + Drizzle + Google OAuth!",
+    message: "Hello World from Fastify + Drizzle + Reimbursement System!",
     endpoints: {
-      users: "/users",
-      auth: "/auth",
       reimbursements: "/reimbursements",
       dashboard: "/dashboard",
     },
   };
 });
-
-// Get all users
-fastify.get("/users", async (request: any, reply: any) => {
-  try {
-    const allUsers = await db.select().from(users);
-    return { users: allUsers };
-  } catch (error) {
-    reply.code(500).send({ error: "Failed to fetch users" });
-  }
-});
-
-// Create a new user
-fastify.post(
-  "/users",
-  async (request: any, reply: any) => {
-    try {
-      const { name, email, googleId, avatar } = request.body as { 
-        name: string; 
-        email: string; 
-        googleId?: string;
-        avatar?: string;
-      };
-
-      if (!name || !email) {
-        reply.code(400).send({ error: "Name and email are required" });
-        return;
-      }
-
-      const newUser = await db
-        .insert(users)
-        .values({ 
-          name, 
-          email, 
-          googleId: googleId || null, 
-          avatar: avatar || null, 
-          lastLogin: new Date() 
-        })
-        .returning();
-      reply.code(201).send({ user: newUser[0] });
-    } catch (error) {
-      console.error("Error creating user:", error);
-      reply.code(500).send({ error: "Failed to create user" });
-    }
-  }
-);
 
 // Dashboard
 fastify.get(
@@ -119,16 +70,19 @@ fastify.get(
   async (request: any, reply: any) => {
     try {
       // Get some stats for the dashboard
-      const totalUsers = await db.select().from(users);
+      const allReimbursements = await db.select().from(require("./db/schema").reimbursements);
 
       return {
-        message: "Welcome to your dashboard!",
+        message: "Welcome to your reimbursement dashboard!",
         stats: {
-          totalUsers: totalUsers.length,
+          totalReimbursements: allReimbursements.length,
+          pendingReimbursements: allReimbursements.filter((r: any) => r.status === "pending").length,
+          approvedReimbursements: allReimbursements.filter((r: any) => r.status === "approved").length,
+          paidReimbursements: allReimbursements.filter((r: any) => r.status === "paid").length,
         },
         actions: [
-          { label: "View Users", url: "/users" },
-          { label: "View Reimbursements", url: "/reimbursements" },
+          { label: "View All Reimbursements", url: "/reimbursements" },
+          { label: "Create New Reimbursement", url: "/reimbursements" },
         ],
       };
     } catch (error) {
@@ -136,9 +90,6 @@ fastify.get(
     }
   }
 );
-
-// Register authentication routes
-fastify.register(authRoutes, { prefix: "/auth" });
 
 // Register reimbursement routes
 fastify.register(reimbursementRoutes, { prefix: "/" });

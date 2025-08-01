@@ -4,6 +4,7 @@ const schema = require("./schema");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  schema: "public"
 });
 
 const db = drizzle(pool, { schema });
