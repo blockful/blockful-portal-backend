@@ -83,6 +83,7 @@ async function createOrUpdateUser(googleProfile: any) {
       }
     }
   } catch (error: any) {
+    console.error("Database error details:", error);
     throw new Error(`Failed to create or update user: ${error.message}`);
   }
 }
@@ -98,6 +99,39 @@ async function getUserById(userId: number) {
 
     return user.length > 0 ? user[0] : null;
   } catch (error) {
+    console.error("Error getting user by ID:", error);
+    return null;
+  }
+}
+
+// Get user by email
+async function getUserByEmail(email: string) {
+  try {
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    return user.length > 0 ? user[0] : null;
+  } catch (error) {
+    console.error("Error getting user by email:", error);
+    return null;
+  }
+}
+
+// Get user by Google ID
+async function getUserByGoogleId(googleId: string) {
+  try {
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.googleId, googleId))
+      .limit(1);
+
+    return user.length > 0 ? user[0] : null;
+  } catch (error) {
+    console.error("Error getting user by Google ID:", error);
     return null;
   }
 }
@@ -106,4 +140,6 @@ module.exports = {
   isAllowedDomain,
   createOrUpdateUser,
   getUserById,
+  getUserByEmail,
+  getUserByGoogleId,
 };

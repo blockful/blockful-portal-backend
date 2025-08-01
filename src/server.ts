@@ -9,6 +9,13 @@ const fastify = Fastify({
   logger: true,
 });
 
+// Register CORS support
+fastify.register(require("@fastify/cors"), {
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+});
+
 // Register cookie support (required for sessions)
 fastify.register(require("@fastify/cookie"));
 
