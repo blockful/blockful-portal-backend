@@ -37,7 +37,7 @@ fastify.register(require("@fastify/oauth2"), {
   },
   callbackUri:
     process.env.GOOGLE_REDIRECT_URI ||
-    "http://localhost:3000/auth/google/callback",
+    "http://localhost:4000/auth/google/callback",
 });
 
 // Hello World endpoint (with optional auth to show user info if logged in)
@@ -145,7 +145,7 @@ fastify.get("/login", async (request: any, reply: any) => {
 // Start server
 const start = async () => {
   try {
-    const port = Number(process.env.PORT) || 3000;
+    const port = Number(process.env.PORT) || 4000;
     const host = process.env.HOST || "0.0.0.0";
 
     await fastify.listen({ port, host });
