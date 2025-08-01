@@ -1,7 +1,7 @@
-const { getUserById, getUserByGoogleId, createOrUpdateUser } = require("./utils");
+const { getUserById, getUserByGoogleId } = require("./utils");
 
-// Authentication middleware for Bearer token validation
-async function requireAuth(request: any, reply: any) {
+// Validate Google OAuth token only
+async function validateGoogleUser(request: any, reply: any) {
   try {
     // Get the Authorization header
     const authHeader = request.headers.authorization;
@@ -30,23 +30,41 @@ async function requireAuth(request: any, reply: any) {
       return;
     }
 
-    // Check if user exists in our database
-    let user = await getUserByGoogleId(userInfo.id);
+    // Add Google user info to request object
+    request.googleUser = userInfo;
+  } catch (error) {
+    console.error("Google validation error:", error);
+    reply.code(500).send({
+      error: "Authentication error",
+      message: "Failed to verify Google authentication",
+    });
+  }
+}
+
+// Validate database user exists
+async function validateDbUser(request: any, reply: any) {
+  try {
+    const googleUser = request.googleUser;
     
-    // If user doesn't exist, create them
+    if (!googleUser) {
+      reply.code(401).send({
+        error: "Google validation required",
+        message: "Please validate Google token first",
+        loginUrl: "/auth/google",
+      });
+      return;
+    }
+
+    // Check if user exists in our database
+    const user = await getUserByGoogleId(googleUser.id);
+    
     if (!user) {
-      try {
-        user = await createOrUpdateUser(userInfo);
-        console.log("Created new user:", user.email);
-      } catch (error: any) {
-        console.error("Failed to create user:", error);
-        reply.code(401).send({
-          error: "User creation failed",
-          message: error.message,
-          loginUrl: "/auth/google",
-        });
-        return;
-      }
+      reply.code(401).send({
+        error: "User not found",
+        message: "User not registered in our system. Please sign in through the application first.",
+        loginUrl: "/auth/google",
+      });
+      return;
     }
 
     if (!user.isActive) {
@@ -58,7 +76,67 @@ async function requireAuth(request: any, reply: any) {
       return;
     }
 
-    // Add user to request object
+    // Add database user to request object
+    request.user = user;
+  } catch (error) {
+    console.error("Database validation error:", error);
+    reply.code(500).send({
+      error: "Authentication error",
+      message: "Failed to verify database user",
+    });
+  }
+}
+
+// Combined middleware for protected routes (both validations)
+async function requireAuth(request: any, reply: any) {
+  try {
+    // First validate Google token
+    const authHeader = request.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      reply.code(401).send({
+        error: "Authentication required",
+        message: "Please provide a valid Bearer token",
+        loginUrl: "/auth/google",
+      });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    const userInfo = await validateGoogleToken(token);
+    
+    if (!userInfo) {
+      reply.code(401).send({
+        error: "Invalid token",
+        message: "The provided token is invalid or expired",
+        loginUrl: "/auth/google",
+      });
+      return;
+    }
+
+    // Then validate database user
+    const user = await getUserByGoogleId(userInfo.id);
+    
+    if (!user) {
+      reply.code(401).send({
+        error: "User not found",
+        message: "User not registered in our system. Please sign in through the application first.",
+        loginUrl: "/auth/google",
+      });
+      return;
+    }
+
+    if (!user.isActive) {
+      reply.code(401).send({
+        error: "Inactive user",
+        message: "User account is inactive",
+        loginUrl: "/auth/google",
+      });
+      return;
+    }
+
+    // Add both to request object
+    request.googleUser = userInfo;
     request.user = user;
   } catch (error) {
     console.error("Authentication error:", error);
@@ -79,20 +157,10 @@ async function optionalAuth(request: any, reply: any) {
       const userInfo = await validateGoogleToken(token);
       
       if (userInfo) {
-        let user = await getUserByGoogleId(userInfo.id);
-        
-        // If user doesn't exist, create them
-        if (!user) {
-          try {
-            user = await createOrUpdateUser(userInfo);
-            console.log("Created new user (optional auth):", user.email);
-          } catch (error) {
-            console.error("Failed to create user in optional auth:", error);
-            // Don't fail the request for optional auth
-          }
-        }
+        const user = await getUserByGoogleId(userInfo.id);
         
         if (user && user.isActive) {
+          request.googleUser = userInfo;
           request.user = user;
         }
       }
@@ -137,6 +205,8 @@ async function validateGoogleToken(token: string) {
 }
 
 module.exports = {
+  validateGoogleUser,
+  validateDbUser,
   requireAuth,
   optionalAuth,
   validateGoogleToken,

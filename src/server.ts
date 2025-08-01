@@ -3,7 +3,7 @@ const Fastify = require("fastify");
 const { db } = require("./db");
 const { users } = require("./db/schema");
 const authRoutes = require("./auth/routes");
-const { requireAuth, optionalAuth } = require("./auth/middleware");
+const { validateGoogleUser, validateDbUser, optionalAuth } = require("./auth/middleware");
 
 const fastify = Fastify({
   logger: true,
@@ -80,7 +80,7 @@ fastify.get("/users", async (request: any, reply: any) => {
 // Create a new user (protected route)
 fastify.post(
   "/users",
-  { preHandler: requireAuth },
+  { preHandler: validateGoogleUser  },
   async (request: any, reply: any) => {
     try {
       const { name, email } = request.body as { name: string; email: string };
@@ -96,6 +96,7 @@ fastify.post(
         .returning();
       reply.code(201).send({ user: newUser[0] });
     } catch (error) {
+      console.error("Error creating user:", error);
       reply.code(500).send({ error: "Failed to create user" });
     }
   }
@@ -104,7 +105,7 @@ fastify.post(
 // Dashboard (protected route example)
 fastify.get(
   "/dashboard",
-  { preHandler: requireAuth },
+  { preHandler: [validateGoogleUser, validateDbUser] },
   async (request: any, reply: any) => {
     const user = request.user;
 
