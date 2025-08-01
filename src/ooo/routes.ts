@@ -114,7 +114,7 @@ async function OOORoutes(fastify: any, options: any) {
       let query = db
         .select()
         .from(ooo)
-        .orderBy(desc(ooo.createdAt))
+        .orderBy(desc(ooo.startDate))
         .limit(parseInt(limit))
         .offset(parseInt(offset));
 
