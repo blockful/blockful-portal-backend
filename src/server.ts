@@ -3,7 +3,7 @@ const Fastify = require("fastify");
 const { db } = require("./db");
 const { users } = require("./db/schema");
 const authRoutes = require("./auth/routes");
-const { validateGoogleUser, validateDbUser, optionalAuth } = require("./auth/middleware");
+const reimbursementRoutes = require("./reimbursement/routes");
 
 const fastify = Fastify({
   logger: true,
@@ -31,6 +31,14 @@ fastify.register(require("@fastify/session"), {
   },
 });
 
+// Register multipart support for file uploads
+fastify.register(require("@fastify/multipart"), {
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 1, // Only one file per request
+  },
+});
+
 // Register Google OAuth2
 fastify.register(require("@fastify/oauth2"), {
   name: "googleOAuth2",
@@ -47,25 +55,18 @@ fastify.register(require("@fastify/oauth2"), {
     "http://localhost:4000/auth/google/callback",
 });
 
-// Hello World endpoint (with optional auth to show user info if logged in)
-fastify.get(
-  "/",
-  { preHandler: optionalAuth },
-  async (request: any, reply: any) => {
-    const user = request.user;
-    return {
-      message: "Hello World from Fastify + Drizzle + Google OAuth!",
-      user: user
-        ? {
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-          }
-        : null,
-      loginUrl: user ? null : "/auth/google",
-    };
-  }
-);
+// Hello World endpoint
+fastify.get("/", async (request: any, reply: any) => {
+  return {
+    message: "Hello World from Fastify + Drizzle + Google OAuth!",
+    endpoints: {
+      users: "/users",
+      auth: "/auth",
+      reimbursements: "/reimbursements",
+      dashboard: "/dashboard",
+    },
+  };
+});
 
 // Get all users
 fastify.get("/users", async (request: any, reply: any) => {
@@ -77,13 +78,17 @@ fastify.get("/users", async (request: any, reply: any) => {
   }
 });
 
-// Create a new user (protected route)
+// Create a new user
 fastify.post(
   "/users",
-  { preHandler: validateGoogleUser  },
   async (request: any, reply: any) => {
     try {
-      const { name, email } = request.body as { name: string; email: string };
+      const { name, email, googleId, avatar } = request.body as { 
+        name: string; 
+        email: string; 
+        googleId?: string;
+        avatar?: string;
+      };
 
       if (!name || !email) {
         reply.code(400).send({ error: "Name and email are required" });
@@ -92,7 +97,13 @@ fastify.post(
 
       const newUser = await db
         .insert(users)
-        .values({ name, email })
+        .values({ 
+          name, 
+          email, 
+          googleId: googleId || null, 
+          avatar: avatar || null, 
+          lastLogin: new Date() 
+        })
         .returning();
       reply.code(201).send({ user: newUser[0] });
     } catch (error) {
@@ -102,32 +113,22 @@ fastify.post(
   }
 );
 
-// Dashboard (protected route example)
+// Dashboard
 fastify.get(
   "/dashboard",
-  { preHandler: [validateGoogleUser, validateDbUser] },
   async (request: any, reply: any) => {
-    const user = request.user;
-
     try {
       // Get some stats for the dashboard
       const totalUsers = await db.select().from(users);
 
       return {
         message: "Welcome to your dashboard!",
-        user: {
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
-          lastLogin: user.lastLogin,
-        },
         stats: {
           totalUsers: totalUsers.length,
         },
         actions: [
-          { label: "View Profile", url: "/auth/me" },
           { label: "View Users", url: "/users" },
-          { label: "Logout", url: "/auth/logout" },
+          { label: "View Reimbursements", url: "/reimbursements" },
         ],
       };
     } catch (error) {
@@ -138,6 +139,9 @@ fastify.get(
 
 // Register authentication routes
 fastify.register(authRoutes, { prefix: "/auth" });
+
+// Register reimbursement routes
+fastify.register(reimbursementRoutes, { prefix: "/" });
 
 // Serve static files (for login page)
 fastify.register(require("@fastify/static"), {

@@ -45,7 +45,7 @@ async function validateGoogleUser(request: any, reply: any) {
 async function validateDbUser(request: any, reply: any) {
   try {
     const googleUser = request.googleUser;
-    
+    console.log("googleUser", googleUser);
     if (!googleUser) {
       reply.code(401).send({
         error: "Google validation required",
@@ -57,7 +57,7 @@ async function validateDbUser(request: any, reply: any) {
 
     // Check if user exists in our database
     const user = await getUserByGoogleId(googleUser.id);
-    
+    console.log("user", user);
     if (!user) {
       reply.code(401).send({
         error: "User not found",
